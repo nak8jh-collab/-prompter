@@ -108,6 +108,12 @@ input[type=range]{width:min(46vw,220px);accent-color:var(--cue)}
 .ck.now{color:var(--text);background-color:var(--cueSoft);background-size:var(--p,0%) 3px}
 .ck.tap{animation:tap .45s}
 .ln.tap{animation:tapl .45s}
+/* 대본 모드: 모든 문장 흰색, 현재 문장 표시와 하단 화살표 없음, 손가락으로 스크롤 */
+#stage.manual .ln,#stage.manual .ln.past,#stage.manual .ln.cur{color:var(--text);cursor:auto}
+#stage.manual .ln.cur::before{display:none}
+#stage.manual .hd,#stage.manual .hd.past{color:var(--cue);cursor:auto}
+#stage.manual .bottom,#stage.manual #count{display:none}
+#stage.manual #aaBtn{margin-left:auto}
 @keyframes tapl{0%{background-color:var(--cueSoft)}100%{background-color:transparent}}
 @keyframes tap{0%{background-color:var(--cue)}100%{background-color:var(--cueSoft)}}
 .hd{cursor:pointer;font-size:13px;letter-spacing:.08em;color:var(--cue);font-family:var(--mono);margin:1.6em 0 .7em;padding-top:10px;border-top:1px dashed var(--rule)}
@@ -159,7 +165,7 @@ input[type=range]{width:min(46vw,220px);accent-color:var(--cue)}
 
   <div class="starts">
     <button id="startBtn" class="startBtn" type="button">발표 시작<small>말하는 대로 자동으로 넘어갑니다</small></button>
-    <button id="manualBtn" class="startBtn" type="button">대본 모드<small>탭이나 ◀ ▶ 로 직접 넘깁니다</small></button>
+    <button id="manualBtn" class="startBtn" type="button">대본 모드<small>손가락으로 넘기며 전체 대본을 봅니다</small></button>
   </div>
 
   <p class="hint">
@@ -608,7 +614,7 @@ $("#clock").addEventListener("click",()=>{if(t0)startClock()});
 
 /* ---------- 탭으로 이동 ---------- */
 $("#flow").addEventListener("click",e=>{
-  if(!P)return;
+  if(!P||mode==="manual")return;
   const ck=e.target.closest(".ck");
   if(ck){jumpChunk(+ck.dataset.c);return}
   const ln=e.target.closest(".ln");
@@ -627,14 +633,22 @@ document.addEventListener("touchend",e=>{
 document.addEventListener("dblclick",e=>{if(!e.target.closest("textarea"))e.preventDefault()});
 
 /* ---------- 화면 전환 ---------- */
+/* 읽기 위치 선에 걸린 문장 (대본 모드에서 음성으로 바꿀 때 시작점) */
+function sentAtReadLine(){
+  const sc=$("#scroller"),line=sc.getBoundingClientRect().top+sc.clientHeight*state.rp/100;
+  const s=P.sents.find(x=>x.el.getBoundingClientRect().bottom>line);
+  return s||P.sents[P.sents.length-1];
+}
 function setMode(m){
+  const wasManual=mode==="manual";
   mode=m;curChunk=-1;curSent=-1;
+  $("#stage").classList.toggle("manual",m==="manual");
   if(m==="manual"){
-    const ci=Math.min(chunkAt(pos),P.chunks.length-1);
-    pos=P.sents[P.chunks[ci].s].start;
     P.chunks.forEach(x=>{x.el.classList.remove("now","said");x.el.style.removeProperty("--p")});
-    showLive("탭 또는 ◀ ▶ 로 넘기기");
-  }else showLive("말하는 대로 따라갑니다");
+  }else{
+    if(wasManual)pos=sentAtReadLine().start;
+    showLive("말하는 대로 따라갑니다");
+  }
   paint();
 }
 function openStage(m){
@@ -663,7 +677,7 @@ $("#backBtn").addEventListener("click",()=>{
 $("#prevBtn").addEventListener("click",()=>jumpSent(-1));
 $("#nextBtn").addEventListener("click",()=>jumpSent(1));
 document.addEventListener("keydown",e=>{
-  if($("#stage").hidden)return;
+  if($("#stage").hidden||mode==="manual")return;
   if(["ArrowRight","ArrowDown","PageDown"," "].includes(e.key)){e.preventDefault();jumpSent(1)}
   else if(["ArrowLeft","ArrowUp","PageUp"].includes(e.key)){e.preventDefault();jumpSent(-1)}
 });
